@@ -1,0 +1,11 @@
+<Solution>
+  <Configurations>
+    <Platform Name="ARM64" />
+    <Platform Name="ARM64EC" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Win32.vcxproj" Id="95c8599d-cc3a-4c7d-a9da-24328692adef">
+    <BuildType Solution="Debug|ARM64EC" Project="Release" />
+  </Project>
+</Solution>
