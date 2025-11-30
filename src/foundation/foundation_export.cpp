@@ -5,8 +5,8 @@ export namespace export32
 {
 extern "C"
 {
-    BOOL CloseHandle(handle hObject);
-    WIN32_ERROR GetLastError();
-    VOID SetLastError(win32::error dwErrCode);
+    BOOL CloseHandle(handle hObject) noexcept;
+    WIN32_ERROR GetLastError() noexcept;
+    VOID SetLastError(win32::error dwErrCode) noexcept;
 }
 } // namespace export32
