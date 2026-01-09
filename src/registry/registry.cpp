@@ -239,7 +239,6 @@ class registry_key
     }
 
   public:
-    // throw registry_error::key_is_exist
     [[nodiscard]] static registry_key create_key(predefined_key key, wcstring_view sub_key, wcstring_view class_name,
                                                  registry_create_option option, registry_access sam_desired,
                                                  project::security_attributes const *security_attributes,
@@ -297,7 +296,6 @@ class registry_key
         set_value_impl(name, reg_qword, static_cast<const void *>(&value), static_cast<unsigned long>(sizeof(value)));
     }
 
-    // throw registry_error::verify_registry_value_type
     auto get_value_info(wcstring_view sub_key, wcstring_view name, registry_restrict_type type = rrf_rt_any)
     {
         struct value_info
@@ -312,10 +310,8 @@ class registry_key
         return result;
     }
 
-    // Passing wstring.data(), wstring.size() + 1 is safe.
-    // Returns the number of characters written, including the trailing 0.
-    std::size_t get_value(wcstring_view sub_key, wcstring_view name, std::span<wchar_t> value,
-                          registry_restrict_type type)
+    std::span<wchar_t> get_value(wcstring_view sub_key, wcstring_view name, std::span<wchar_t> value,
+                                 registry_restrict_type type)
     {
         auto type_u = to_underlying(type);
         check_one(type_u & to_underlying(rrf_rt_reg_sz), type_u & to_underlying(rrf_rt_reg_expand_sz),
@@ -323,38 +319,55 @@ class registry_key
         unsigned long buffer_size = static_cast<unsigned long>((value.size() + 1u) * sizeof(wchar_t));
         check_throw(export32::RegGetValueW(hKey_, null_or(sub_key), null_or(name), to_underlying(type), nullptr,
                                            static_cast<void *>(value.data()), &buffer_size));
-        return buffer_size / sizeof(wchar_t);
+        return value.first(buffer_size / sizeof(wchar_t));
     }
 
-    std::size_t get_value(wcstring_view sub_key, wcstring_view name, std::span<std::byte> data,
-                          registry_restrict_type type = rrf_rt_reg_binary)
+    std::span<unsigned char> get_value(wcstring_view sub_key, wcstring_view name, std::span<unsigned char> data,
+                                       registry_restrict_type type = rrf_rt_reg_binary)
     {
         auto type_u = to_underlying(type);
         check_one(type_u & to_underlying(rrf_rt_reg_none), type_u & to_underlying(rrf_rt_reg_binary));
         unsigned long buffer_size = static_cast<unsigned long>(data.size());
         check_throw(export32::RegGetValueW(hKey_, null_or(sub_key), null_or(name), to_underlying(type), nullptr,
                                            static_cast<void *>(data.data()), &buffer_size));
-        return buffer_size;
+        return data.first(buffer_size);
     }
 
-    std::size_t get_value(wcstring_view sub_key, wcstring_view name, std::span<unsigned char> data,
-                          registry_restrict_type type = rrf_rt_reg_binary)
+    std::span<std::byte> get_value(wcstring_view sub_key, wcstring_view name, std::span<std::byte> data,
+                                   registry_restrict_type type = rrf_rt_reg_binary)
     {
-        return get_value(sub_key, name, std::as_writable_bytes(data), type);
+        return std::as_writable_bytes(
+            get_value(sub_key, name, std::span{reinterpret_cast<unsigned char *>(data.data()), data.size()}, type));
     }
 
-    void get_value(wcstring_view sub_key, wcstring_view name, unsigned long &value)
+    struct dword_tag_t
     {
+    };
+
+    static inline constexpr dword_tag_t dword_tag{};
+
+    unsigned long get_value(wcstring_view sub_key, wcstring_view name, dword_tag_t)
+    {
+        unsigned long value{};
+        unsigned long buffer_size = static_cast<unsigned long>(sizeof(value));
+        check_throw(export32::RegGetValueW(hKey_, null_or(sub_key), null_or(name), to_underlying(rrf_rt_reg_dword),
+                                           nullptr, static_cast<void *>(&value), &buffer_size));
+        return value;
+    }
+
+    struct qword_tag_t
+    {
+    };
+
+    static inline constexpr qword_tag_t qword_tag{};
+
+    unsigned long long get_value(wcstring_view sub_key, wcstring_view name, qword_tag_t)
+    {
+        unsigned long long value{};
         unsigned long buffer_size = static_cast<unsigned long>(sizeof(value));
         check_throw(export32::RegGetValueW(hKey_, null_or(sub_key), null_or(name), to_underlying(rrf_rt_reg_qword),
                                            nullptr, static_cast<void *>(&value), &buffer_size));
-    }
-
-    void get_value(wcstring_view sub_key, wcstring_view name, unsigned long long &value)
-    {
-        unsigned long buffer_size = static_cast<unsigned long>(sizeof(value));
-        check_throw(export32::RegGetValueW(hKey_, null_or(sub_key), null_or(name), to_underlying(rrf_rt_reg_qword),
-                                           nullptr, static_cast<void *>(&value), &buffer_size));
+        return value;
     }
 
     void delete_key(wcstring_view sub_key = {}, registry_access sam_desired = {})
